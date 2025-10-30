@@ -29,33 +29,33 @@ export function regimeDetector({
   const closeQqq = qqq.map((c) => c.close);
   const closeIwm = iwm.map((c) => c.close);
 
-  const spySignal = emaStackSignal(closeSpy);
-  const qqqSignal = emaStackSignal(closeQqq);
-  const iwmSignal = emaStackSignal(closeIwm);
+  const normalizeSignal = (signal: 'bull' | 'bear' | 'mixed'): Regime =>
+    signal === 'mixed' ? 'neutral' : signal;
+
+  const spySignal = normalizeSignal(emaStackSignal(closeSpy));
+  const qqqSignal = normalizeSignal(emaStackSignal(closeQqq));
+  const iwmSignal = normalizeSignal(emaStackSignal(closeIwm));
 
   const breadth = breadthProxy(closeIwm, closeSpy);
-  const vixValue = vix[vix.length - 1] ?? 0;
-  const vixState = vixTrend(vix);
-  const tnxState = yieldTrend(tnx);
+  const vixClose = vix;
+  const vixDir = vixTrend(vixClose);
+  const yldDir = yieldTrend(tnx);
 
   const gammaFlip = pctChange(closeSpy[closeSpy.length - 1], closeSpy[Math.max(0, closeSpy.length - 10)]) > 0.02;
 
-  const bullishCount = [spySignal, qqqSignal, iwmSignal].filter((s) => s === 'bull').length;
-  const bearishCount = [spySignal, qqqSignal, iwmSignal].filter((s) => s === 'bear').length;
-
-  let regime: Regime = 'neutral';
-  if (bullishCount >= 2 && breadth >= 0.98 && vixState !== 'up') {
-    regime = 'bull';
-  } else if (bearishCount >= 2 && (breadth <= 0.96 || vixState === 'up')) {
-    regime = 'bear';
-  }
-
-  if (tnxState === 'up' && regime === 'bull' && vixState === 'up') {
-    regime = 'neutral';
-  }
+  const decideRegime = () => {
+    const votes = [spySignal, qqqSignal, iwmSignal]; // 'bull'|'bear'|'neutral'
+    const bullCount = votes.filter((v) => v === 'bull').length;
+    const bearCount = votes.filter((v) => v === 'bear').length;
+    let regime: Regime = 'neutral';
+    if (bullCount >= 2 && breadth >= 60 && vixDir !== 'up') regime = 'bull';
+    else if (bearCount >= 2 && vixDir === 'up') regime = 'bear';
+    else regime = 'neutral';
+    return regime;
+  };
 
   return {
-    regime,
+    regime: decideRegime(),
     signals: {
       emas: {
         spy: spySignal,
@@ -63,8 +63,8 @@ export function regimeDetector({
         iwm: iwmSignal
       },
       breadth,
-      vix: Number(vixValue.toFixed(2)),
-      tnxTrend: tnxState,
+      vix: vixClose[vixClose.length - 1] ?? 0,
+      tnxTrend: yldDir,
       gammaFlip
     }
   };
