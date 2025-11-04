@@ -14,8 +14,38 @@ async function getSample() {
   return parseCsv(content);
 }
 
+// 🧠 Fetch live AAPL candles from your API
+async function getLiveCandles() {
+  try {
+    const res = await fetch(
+      'https://chart-assassin-pro.vercel.app/api/candles?symbol=AAPL&tf=15m&limit=100',
+      { cache: 'no-store' }
+    );
+    return await res.json();
+  } catch (e) {
+    console.error('Live data fetch failed', e);
+    return null;
+  }
+}
+
+// 🧠 Fetch live AAPL candles from your API
+async function getLiveCandles() {
+  try {
+    const res = await fetch(
+      'https://chart-assassin-pro.vercel.app/api/candles?symbol=AAPL&tf=15m&limit=100',
+      { cache: 'no-store' }
+    );
+    return await res.json();
+  } catch (e) {
+    console.error('Live data fetch failed', e);
+    return null;
+  }
+}
+
+
+
 export default async function Page() {
-  const sampleData = await getSample();
+const sampleData = (await getLiveCandles()) || (await getSample());
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6">
