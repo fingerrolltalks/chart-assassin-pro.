@@ -56,4 +56,3 @@ export default async function Page() {
     </div>
   );
 }
-fix: remove duplicate function and clean up page.tsx
