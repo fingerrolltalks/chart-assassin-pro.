@@ -70,3 +70,5 @@ const sampleData = (await getLiveCandles()) || (await getSample());
     </div>
   );
 }
+
+fix: remove duplicate getLiveCandles function
