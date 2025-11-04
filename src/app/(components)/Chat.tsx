@@ -7,7 +7,7 @@ import { toOhlcvTuples } from '../../lib/utils/csv';
 import type { PatternDetection } from '../../lib/tech/patternEngine';
 
 const quickPrompts = [
-  'Analyze SPY 15m scalp using latest uploaded data.',
+  'Analyze AAPL 15m scalp using latest live data.',
   'Generate a swing plan for NVDA daily with manual catalysts: earnings next week, VIX sub-18.',
   'Detect patterns on QQQ and propose entries with ATR stops.',
   'Size a position with $500 risk from 450 entry, 447.8 stop.'
@@ -18,74 +18,86 @@ export function Chat() {
   const pushMessage = useAppStore((state) => state.pushMessage);
   const setAnalysis = useAppStore((state) => state.setAnalysis);
   const setPatterns = useAppStore((state) => state.setPatterns);
-  const messages = useAppStore((state) => state.messages);
   const setLoading = useAppStore((state) => state.setLoading);
+  const messages = useAppStore((state) => state.messages);
+
   const [prompt, setPrompt] = useState('');
 
-  const disabled = useMemo(() => data.length === 0 || loading, [data.length, loading]);
+  const disabled = useMemo(() => !data || data.length === 0 || loading, [data, loading]);
 
   const runAnalysis = useCallback(
     async (customPrompt?: string) => {
-      if (!data.length) {
-        alert('Upload or load data first.');
+      if (!data || data.length === 0) {
+        alert('No live data detected. Please refresh or re-fetch candles.');
         return;
       }
+
       const userPrompt = customPrompt ?? prompt;
       pushMessage({ role: 'user', content: userPrompt || 'Generate plan', createdAt: Date.now() });
+
       try {
         setLoading(true);
+
         const body = {
           ticker,
           timeframe,
           mode,
           catalysts,
-          ohlcv: toOhlcvTuples(data)
+          ohlcv: toOhlcvTuples(data), // this now uses your live candles
         };
+
         const [patternRes, analyzeRes] = await Promise.all([
           fetch('/api/pattern', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ohlcv: body.ohlcv })
+            body: JSON.stringify({ ohlcv: body.ohlcv }),
           }),
           fetch('/api/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          })
+            body: JSON.stringify(body),
+          }),
         ]);
+
         if (!patternRes.ok || !analyzeRes.ok) {
-          throw new Error('API error');
+          throw new Error('API error — check console logs.');
         }
+
         const patternJson = (await patternRes.json()) as { patterns: PatternDetection[] };
         const analysisJson = await analyzeRes.json();
+
+        // Save to store
         setPatterns(patternJson.patterns);
-        const lines = analysisJson.report.split('\n');
+
+        const lines = analysisJson.report?.split('\n') ?? [];
         setAnalysis({
-          regime: analysisJson.regime,
+          regime: analysisJson.regime ?? 'Unknown',
           bullets: lines.slice(1, 8),
           execution: lines.at(-2) ?? '',
-          confidence: analysisJson.stats.confidence,
-          rr: analysisJson.stats.rr,
-          levels: analysisJson.levels
+          confidence: analysisJson.stats?.confidence ?? 0,
+          rr: analysisJson.stats?.rr ?? 0,
+          levels: analysisJson.levels ?? [],
         });
+
         pushMessage({
           role: 'assistant',
-          content: analysisJson.report,
-          createdAt: Date.now()
+          content: analysisJson.report || 'No report generated.',
+          createdAt: Date.now(),
         });
+
         setPrompt('');
       } catch (error) {
         console.error(error);
         pushMessage({
           role: 'assistant',
-          content: 'Unable to generate analysis. Ensure inputs are valid.',
-          createdAt: Date.now()
+          content: '❌ Unable to generate analysis. Check your live feed or API key.',
+          createdAt: Date.now(),
         });
       } finally {
         setLoading(false);
       }
     },
-    [data, ticker, timeframe, mode, catalysts, pushMessage, setLoading, setAnalysis, setPatterns, prompt]
+    [data, ticker, timeframe, mode, catalysts, prompt, pushMessage, setAnalysis, setPatterns, setLoading]
   );
 
   return (
@@ -98,7 +110,9 @@ export function Chat() {
       <header className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-slate-100">Assistant</h2>
-          <p className="text-xs text-slate-400">Real-time tactical output with full regime + pattern context.</p>
+          <p className="text-xs text-slate-400">
+            Real-time tactical output with full regime + pattern context.
+          </p>
         </div>
         <button
           disabled={disabled}
@@ -108,6 +122,7 @@ export function Chat() {
           {loading ? 'Generating…' : 'Generate Plan'}
         </button>
       </header>
+
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-sm">
         {messages.length === 0 ? (
           <p className="text-slate-500">Prompt the assistant or use quick suggestions below.</p>
@@ -122,6 +137,7 @@ export function Chat() {
           ))
         )}
       </div>
+
       <div className="mt-4 space-y-3">
         <textarea
           value={prompt}
