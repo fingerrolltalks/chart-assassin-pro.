@@ -28,31 +28,17 @@ async function getLiveCandles() {
   }
 }
 
-// 🧠 Fetch live AAPL candles from your API
-async function getLiveCandles() {
-  try {
-    const res = await fetch(
-      'https://chart-assassin-pro.vercel.app/api/candles?symbol=AAPL&tf=15m&limit=100',
-      { cache: 'no-store' }
-    );
-    return await res.json();
-  } catch (e) {
-    console.error('Live data fetch failed', e);
-    return null;
-  }
-}
-
-
-
 export default async function Page() {
-const sampleData = (await getLiveCandles()) || (await getSample());
+  const sampleData = (await getLiveCandles()) || (await getSample());
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6">
       <InitialLoader data={sampleData} ticker="SPY" />
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-100">Chart Assassin — Pro</h1>
+          <h1 className="text-3xl font-semibold text-slate-100">
+            Chart Assassin — Pro
+          </h1>
           <p className="text-sm text-slate-400">
             Elite real-time trading assistant combining regime, pattern, catalyst, and risk intelligence.
           </p>
@@ -70,5 +56,3 @@ const sampleData = (await getLiveCandles()) || (await getSample());
     </div>
   );
 }
-
-fix: remove duplicate getLiveCandles function
