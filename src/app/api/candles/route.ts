@@ -12,7 +12,7 @@ export async function GET(req: Request) {
       .toISOString()
       .split("T")[0];
 
-    // ✅ Massive (Polygon) API endpoint
+    // ✅ Correct Massive (Polygon) API endpoint
     const url = `https://api.massive.app/v2/aggs/ticker/${symbol}/range/15/minute/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${process.env.POLYGON_API_KEY}`;
 
     const res = await fetch(url);
