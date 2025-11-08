@@ -71,12 +71,12 @@ export function Chat() {
 
         const lines = analysisJson.report?.split('\n') ?? [];
         setAnalysis({
-          regime: analysisJson.regime ?? 'Unknown',
-          bullets: lines.slice(1, 8),
-          execution: lines.at(-2) ?? '',
+          regime: analysisJson.regime ?? 'neutral',
+          bullets: lines.slice(1, Math.max(1, lines.length - 1)),
+          execution: lines.at(-1) ?? '',
           confidence: analysisJson.stats?.confidence ?? 0,
           rr: analysisJson.stats?.rr ?? 0,
-          levels: analysisJson.levels ?? [],
+          levels: analysisJson.levels ?? { entry: 0, stop: 0, target: 0 },
         });
 
         pushMessage({
