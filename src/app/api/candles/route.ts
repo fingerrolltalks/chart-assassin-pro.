@@ -1,32 +1,64 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(req: Request) {
+type PolygonAggsResponse = {
+  status: string;
+  results?: unknown[];
+  error?: string;
+};
+
+const API_HOST = "https://api.polygon.io";
+const DEFAULT_MULTIPLIER = 5;
+const DEFAULT_TIMESPAN = "minute";
+const DEFAULT_LIMIT = 5000;
+
+function formatDate(date: Date) {
+  return date.toISOString().split(".")[0] + "Z";
+}
+
+export async function GET(req: NextRequest) {
   try {
+    const apiKey = process.env.POLYGON_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Missing POLYGON_API_KEY environment variable" },
+        { status: 500 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
-    const symbol = searchParams.get("symbol")?.toUpperCase() || "AAPL";
+    const symbol = searchParams.get("symbol")?.toUpperCase() ?? "AAPL";
+    const multiplier = Number(searchParams.get("multiplier")) || DEFAULT_MULTIPLIER;
+    const timespan = searchParams.get("timespan") ?? DEFAULT_TIMESPAN;
+    const limit = Number(searchParams.get("limit")) || DEFAULT_LIMIT;
 
-    // Automatically get last 24 hours of data
     const now = new Date();
-    const to = now.toISOString().split("T")[0];
-    const from = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const from = searchParams.get("from") ?? formatDate(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+    const to = searchParams.get("to") ?? formatDate(now);
 
-    // ✅ Correct Massive (Polygon) API endpoint
-    const url = `https://api.massive.app/v2/aggs/ticker/${symbol}/range/15/minute/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${process.env.POLYGON_API_KEY}`;
+    const url = new URL(`${API_HOST}/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${from}/${to}`);
+    url.searchParams.set("adjusted", "true");
+    url.searchParams.set("limit", limit.toString());
+    url.searchParams.set("sort", "asc");
+    url.searchParams.set("apiKey", apiKey);
 
-    const res = await fetch(url);
-    const data = await res.json();
+    const response = await fetch(url, {
+      headers: { "Accept": "application/json" },
+      next: { revalidate: 0 },
+    });
 
-    if (!res.ok || data.status === "ERROR") {
-      throw new Error(data.error || "Massive API error");
+    const data: PolygonAggsResponse = await response.json();
+
+    if (!response.ok || data.status !== "OK") {
+      const message = data.error || `Polygon API request failed with status ${response.status}`;
+      return NextResponse.json({ error: message }, { status: response.status || 500 });
     }
 
     return NextResponse.json(data);
-  } catch (err: any) {
-    console.error("API Error:", err.message);
+  } catch (error) {
+    console.error("Polygon API error:", error);
     return NextResponse.json(
-      { error: "Massive request failed", details: err.message },
+      { error: "Unexpected error fetching data from Polygon" },
       { status: 500 }
     );
   }
