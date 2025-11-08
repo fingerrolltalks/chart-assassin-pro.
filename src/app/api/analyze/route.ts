@@ -1,56 +1,29 @@
-import { NextResponse } from 'next/server';
-import { analyzeInputSchema } from '../../../lib/core/schema';
-import { fromOhlcvTuples } from '../../../lib/utils/csv';
-import { runPatternEngine } from '../../../lib/tech/patternEngine';
-import { regimeDetector } from '../../../lib/tech/regimeDetector';
-import { buildPlaybook } from '../../../lib/core/templates';
-import { formatAssistantContract } from '../../../lib/core/formatter';
+import { NextResponse } from "next/server"
 
-export async function POST(request: Request) {
-  const json = await request.json().catch(() => null);
-  const parseResult = analyzeInputSchema.safeParse(json);
-  if (!parseResult.success) {
-    return NextResponse.json({ error: parseResult.error.flatten() }, { status: 400 });
-  }
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const symbol = searchParams.get("symbol")?.toUpperCase() || "AAPL"
 
-  const { ticker, timeframe, ohlcv, mode, catalysts = [] } = parseResult.data;
-  const candles = fromOhlcvTuples(ohlcv);
-  const patterns = runPatternEngine(candles);
-  const closeSeries = candles.map((candle) => candle.close);
-  const vix = closeSeries.slice(-10).map((value) => Math.max(10, value * 0.02));
-  const tnx = closeSeries.slice(-10).map((value) => Math.max(3, value * 0.005));
-  const detection = regimeDetector({
-    spy: candles,
-    qqq: candles,
-    iwm: candles,
-    vix,
-    tnx
-  });
+    // Calculate a valid date window (7 days back)
+    const now = new Date()
+    const to = now.toISOString().split("T")[0]
+    const from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0]
 
-  const plan = buildPlaybook({
-    ticker,
-    timeframe,
-    mode,
-    regime: detection.regime,
-    signals: detection.signals,
-    data: candles,
-    patterns,
-    catalysts
-  });
+    // Polygon API endpoint
+    const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/15/minute/${from}/${to}?adjusted=true&sort=asc&apiKey=${process.env.POLYGON_API_KEY}`
 
-  const report = formatAssistantContract({ plan, regime: detection.regime });
-
-  return NextResponse.json({
-    regime: detection.regime,
-    report,
-    stats: {
-      rr: plan.rr,
-      confidence: plan.confidence
-    },
-    levels: {
-      entry: candles[candles.length - 1]?.close ?? 0,
-      stop: plan.stop,
-      target: plan.target
+    const resp = await fetch(url)
+    if (!resp.ok) {
+      const errText = await resp.text()
+      return NextResponse.json({ error: errText }, { status: resp.status })
     }
-  });
+
+    const data = await resp.json()
+    return NextResponse.json({ results: data.results || [] })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }
