@@ -16,6 +16,7 @@ export function CommandBar() {
   const [open, setOpen] = useState(false);
   const setData = useAppStore((state) => state.setData);
   const setTicker = useAppStore((state) => state.setTicker);
+  const setTimeframe = useAppStore((state) => state.setTimeframe);
   const reset = useAppStore((state) => state.reset);
 
   useEffect(() => {
@@ -34,13 +35,16 @@ export function CommandBar() {
       try {
         const data = await loadSample(symbol);
         setTicker(symbol.replace('_15m', ''));
+        if (symbol.includes('_15m')) {
+          setTimeframe('15m');
+        }
         setData(data);
         setOpen(false);
       } catch (error) {
         console.error(error);
       }
     },
-    [setData, setTicker]
+    [setData, setTicker, setTimeframe]
   );
 
   return (

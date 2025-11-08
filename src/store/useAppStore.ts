@@ -57,8 +57,8 @@ type AppState = {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      ticker: 'SPY',
-      timeframe: '15m',
+      ticker: '',
+      timeframe: '5m',
       mode: 'scalp',
       catalysts: [],
       data: [],
@@ -84,14 +84,15 @@ export const useAppStore = create<AppState>()(
       setLoading: (value) => set({ loading: value }),
       reset: () =>
         set({
-          ticker: 'SPY',
-          timeframe: '15m',
+          ticker: '',
+          timeframe: '5m',
           mode: 'scalp',
           catalysts: [],
           data: [],
           patterns: [],
           analysis: undefined,
-          messages: []
+          messages: [],
+          loading: false
         })
     }),
     {
